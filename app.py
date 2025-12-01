@@ -52,7 +52,7 @@ date = st.sidebar.date_input("Date", datetime.now())
 category = st.sidebar.selectbox(
     "Category", ["Groceries", "Food", "Utilities", "Shopping", "Travel", "Healthcare", "Subscriptions"]
 )
-amount = st.sidebar.number_input("Amount ($)", min_value=0.01, format="%.2f")
+amount = st.sidebar.number_input("Amount (₹)", min_value=0.01, format="%.2f")
 
 if st.sidebar.button("Add Expense"):
     add_expense(conn, str(date), category, amount)
@@ -101,3 +101,4 @@ else:
         c.execute("DELETE FROM expenses WHERE id=?", (delete_id,))
         conn.commit()
         st.success("Deleted successfully!")
+
