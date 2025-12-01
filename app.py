@@ -56,7 +56,7 @@ entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
 if entry_type == "Income":
     category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
 else:
-    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Travel", "Shopping", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
+    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport", "Shopping", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
 
 amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
 
@@ -138,4 +138,5 @@ if st.button("Delete"):
     c.execute("DELETE FROM expenses WHERE id=?", (delete_id,))
     conn.commit()
     st.success("Deleted!")
+
 
