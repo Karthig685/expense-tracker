@@ -3,6 +3,7 @@ from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import calendar
 import matplotlib.pyplot as plt
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
@@ -42,11 +43,13 @@ st.session_state.setdefault("entry_type", "Income")
 # -------------------------------------------------
 @st.cache_data(ttl=60)
 def load_data(month, year):
+    # compute last day of month dynamically to avoid hardcoding 31
+    last_day = calendar.monthrange(year, month)[1]
     res = (
         supabase.table("expenses")
         .select("*")
         .gte("date", f"{year}-{month:02d}-01")
-        .lte("date", f"{year}-{month:02d}-31")
+        .lte("date", f"{year}-{month:02d}-{last_day:02d}")
         .execute()
     )
     df = pd.DataFrame(res.data)
@@ -56,11 +59,13 @@ def load_data(month, year):
 
 def add_entry(data):
     supabase.table("expenses").insert(data).execute()
-    st.cache_data.clear()
+    # clear cache for load_data only so other caches remain intact
+    load_data.clear()
 
 def delete_entry(entry_id):
     supabase.table("expenses").delete().eq("id", entry_id).execute()
-    st.cache_data.clear()
+    # clear cache for load_data only so other caches remain intact
+    load_data.clear()
 
 # -------------------------------------------------
 # HEADER
@@ -110,18 +115,10 @@ if not df.empty:
 # ================================================================
 
 # -------------------------------------------------
-# ADD ENTRY (CORRECT UX)
+# CATEGORY MAP & ADD ENTRY (MOBILE-FRIENDLY UX)
+# Entry type radio stays outside the form; the whole
+# add-entry UI is placed inside an expander for small screens.
 # -------------------------------------------------
-st.subheader("➕ Add Entry")
-
-# 🔴 MUST BE OUTSIDE FORM
-entry_type = st.radio(
-    "Type",
-    ["Income", "Expense", "Savings"],
-    horizontal=True,
-    key="entry_type_selector"
-)
-
 category_map = {
     "Income": ["Salary", "Bonus", "Interest", "Other"],
     "Expense": [
@@ -132,45 +129,52 @@ category_map = {
     "Savings": ["Emergency Fund", "Investments", "FD / RD"]
 }
 
-# Category updates instantly now ✅
-category = st.selectbox(
-    "Category",
-    category_map[entry_type],
-    key=f"category_{entry_type}"
-)
+with st.expander("➕ Add Entry", expanded=False):
+    # Entry type must be outside the form so category updates correctly
+    entry_type = st.radio(
+        "Type",
+        ["Income", "Expense", "Savings"],
+        horizontal=True,
+        key="entry_type"
+    )
 
-with st.form("add_form", clear_on_submit=True):
-    date = st.date_input("Date", today)
-    amount = st.number_input("Amount (₹)", min_value=1.0, step=100.0)
-    submit = st.form_submit_button("Add Entry")
+    # Category updates dynamically based on selected type
+    category = st.selectbox(
+        "Category",
+        category_map.get(entry_type, []),
+        key="entry_category"
+    )
 
-    if submit:
-        add_entry({
-            "date": str(date),
-            "type": entry_type,
-            "category": category,
-            "amount": amount
-        })
-        st.success("Entry added successfully ✅")
+    with st.form("add_form", clear_on_submit=True):
+        date = st.date_input("Date", today)
+        amount = st.number_input("Amount (₹)", min_value=1.0, step=100.0)
+        submit = st.form_submit_button("Add Entry")
+
+        if submit:
+            add_entry({
+                "date": str(date),
+                "type": entry_type,
+                "category": category,
+                "amount": amount
+            })
+            st.success("Entry added successfully ✅")
+            # Clear the load_data cache and rerun to show new data
+            load_data.clear()
+            st.experimental_rerun()
 
 # -------------------------------------------------
-# SUMMARY
+# SUMMARY (ALWAYS VISIBLE FOR MOBILE)
 # -------------------------------------------------
-if df.empty:
-    st.info("No records for this month.")
-    st.stop()
-
-income = df[df.type == "Income"].amount.sum()
-expense = df[df.type == "Expense"].amount.sum()
-savings = df[df.type == "Savings"].amount.sum()
-net = income - expense - savings
-
 st.subheader("📘 Monthly Summary")
+# Use values computed earlier (defaults to 0.0 when no records)
 a, b, c, d = st.columns(4)
 a.metric("Income", f"₹{income:,.0f}")
-b.metric("Expenses", f"₹{expense:,.0f}")
+b.metric("Expenses", f"₹{expenses:,.0f}")
 c.metric("Savings", f"₹{savings:,.0f}")
-d.metric("Net Balance", f"₹{net:,.0f}")
+d.metric("Net Balance", f"₹{net_balance:,.0f}")
+
+if df.empty:
+    st.info("No records for this month.")
 
 # -------------------------------------------------
 # CHART
@@ -182,19 +186,31 @@ if not exp_df.empty:
     st.plotly_chart(fig, use_container_width=True)
 
 # -------------------------------------------------
-# TABLE
+# TABLE + SAFE DELETE WORKFLOW
 # -------------------------------------------------
 st.subheader("📄 Records")
-selected = st.dataframe(
-    df.sort_values("date", ascending=False),
-    hide_index=True,
-    selection_mode="single-row",
-    use_container_width=True
-)
+df_table = df.sort_values("date", ascending=False)
+st.dataframe(df_table, hide_index=True, use_container_width=True)
 
-if selected and st.button("🗑 Delete Selected"):
-    delete_entry(selected["id"].values[0])
-    st.success("Deleted")
+if not df_table.empty:
+    # Build human-readable labels for safe deletion by ID
+    options = []
+    for _, row in df_table.iterrows():
+        date_str = row["date"].date() if pd.notnull(row["date"]) else ""
+        label = f"{int(row['id'])} | {date_str} | {row['type']} | {row['category']} | ₹{row['amount']:,.0f}"
+        options.append(label)
+
+    selected_label = st.selectbox("Select record to delete", options)
+    if st.button("🗑 Delete Selected"):
+        try:
+            selected_id = int(selected_label.split(" | ")[0])
+            delete_entry(selected_id)
+            st.success("Deleted")
+            # ensure cache cleared and UI refreshed
+            load_data.clear()
+            st.experimental_rerun()
+        except Exception:
+            st.error("Failed to delete selected record.")
 
 # -------------------------------------------------
 # PDF REPORT
@@ -332,6 +348,5 @@ if st.button("📥 Generate Visual PDF Report"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
-
 
 
