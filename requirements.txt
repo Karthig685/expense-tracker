@@ -1,5 +1,9 @@
 streamlit
-streamlit-option-menu
-supabase
 pandas
 plotly
+supabase
+python-dotenv
+reportlab
+kaleido
+matplotlib
+numpy
