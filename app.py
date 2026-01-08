@@ -11,7 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import inch
 import tempfile
-
+#new tree
 # -------------------------------------------------
 # PAGE CONFIG
 # -------------------------------------------------
@@ -347,6 +347,7 @@ if st.button("📥 Generate Visual PDF Report"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
 
 
