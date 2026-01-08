@@ -78,7 +78,7 @@ colA, colB, colC, colD = st.columns([1,1,1,1])
 
 with colA:
     st.markdown(f"""
-    <div style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#0a9396;padding:10px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Income</h3>
         <h2 style='color:#d8f3dc;margin:0;'>₹{income:,.2f}</h2>
     </div>
@@ -86,7 +86,7 @@ with colA:
 
 with colB:
     st.markdown(f"""
-    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#9b2226;padding:10px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Expenses</h3>
         <h2 style='color:#fcd5ce;margin:0;'>₹{expenses:,.2f}</h2>
     </div>
@@ -130,4 +130,5 @@ delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
 if st.button("Delete"):
     delete_entry(delete_id)
     st.success("Deleted!")
+
 
