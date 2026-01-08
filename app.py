@@ -3,6 +3,8 @@ from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import matplotlib.pyplot as plt
+from reportlab.platypus import Image as RLImage
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
@@ -210,3 +212,4 @@ if st.button("📥 Generate PDF"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
