@@ -17,7 +17,7 @@ import tempfile
 # -------------------------------------------------
 st.set_page_config(
     page_title="Smart Expense Tracker",
-    page_icon="💸",
+    page_icon="₹",
     layout="centered"
 )
 
@@ -129,7 +129,7 @@ category_map = {
     "Savings": ["Emergency Fund", "Investments", "FD / RD"]
 }
 
-with st.expander("➕ Add Entry", expanded=False):
+with st.expander("Add Entry", expanded=False):
     # Entry type must be outside the form so category updates correctly
     entry_type = st.radio(
         "Type",
@@ -157,7 +157,7 @@ with st.expander("➕ Add Entry", expanded=False):
                 "category": category,
                 "amount": amount
             })
-            st.success("Entry added successfully ✅")
+            st.success("Entry added successfully")
             # Clear the load_data cache and rerun to show new data
             load_data.clear()
             st.experimental_rerun()
@@ -388,6 +388,7 @@ if st.button("📥 Generate Visual PDF Report"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
 
 
