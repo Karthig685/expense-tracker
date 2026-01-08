@@ -6,7 +6,7 @@ from datetime import datetime
 
 # --- SUPABASE SETUP ---
 url = "https://ykgucpcjxwddnwznkqfa.supabase.co"
-key = "YOUR_SUPABASE_KEY"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZ3VjcGNqeHdkZG53em5rcWZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1Njg1MjgsImV4cCI6MjA4MDE0NDUyOH0.A-Gwlhbrb9QEa9u9C2Ghobm2zPw-zaLLUFdKU29rrP8"
 supabase: Client = create_client(url, key)
 
 # --- INSERT NEW ENTRY ---
@@ -20,6 +20,7 @@ def add_entry(date, category, amount, entry_type):
 
 # --- FETCH DATA ---
 def load_data(month, year):
+    # Filter by month/year
     query = supabase.table("expenses").select("*").execute()
     df = pd.DataFrame(query.data)
     if df.empty:
@@ -33,29 +34,24 @@ def delete_entry(entry_id):
     supabase.table("expenses").delete().eq("id", entry_id).execute()
 
 # --- STREAMLIT CONFIG ---
-st.set_page_config(page_title="Expense Tracker 💰", layout="wide")
+st.set_page_config(page_title="Expense Tracker (₹)", layout="wide")
 st.title("💰 Expense Tracker")
 
 # --- SIDEBAR INPUT ---
 st.sidebar.header("Add Entry (Income / Expense)")
 date = st.sidebar.date_input("Date", datetime.now())
-entry_type = st.sidebar.selectbox("Type", ["Income", "Expense", "Savings"])
+entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
 
 if entry_type == "Income":
     category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
-elif entry_type == "Expense":
-    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport",
-                                                 "Snacks", "Fashion", "Rent", "Bills", 
-                                                 "Utilities", "Health Care", "Electronics", 
-                                                 "Savings", "Other"])
 else:
-    category = st.sidebar.selectbox("Category", ["RD", "Investments", "Other"])
+    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
 
 amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
 
 if st.sidebar.button("Add"):
     add_entry(date, category, amount, entry_type)
-    st.sidebar.success("✅ Added successfully!")
+    st.sidebar.success("Added successfully!")
 
 # --- MONTH FILTER ---
 today = datetime.now()
@@ -73,43 +69,32 @@ st.markdown("### 📘 Accounting Summary")
 
 income = df[df["type"] == "Income"]["amount"].sum() if not df.empty else 0
 expenses = df[df["type"] == "Expense"]["amount"].sum() if not df.empty else 0
-savings = df[(df["type"]=="Expense") & (df["category"]=="Savings")]["amount"].sum() if not df.empty else 0
 balance = income - expenses
 
-# Responsive columns
-cols = st.columns([1,1,1,1])
-colors = {"Income":"#0a9396", "Expenses":"#9b2226", "Balance":"#001d3d", "Savings":"#f4a261"}
+colA, colB, colC = st.columns([1,1,1])
 
-with cols[0]:
+with colA:
     st.markdown(f"""
-    <div style='background:{colors["Income"]};padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Income</h3>
         <h2 style='color:#d8f3dc;margin:0;'>₹{income:,.2f}</h2>
     </div>
     """, unsafe_allow_html=True)
 
-with cols[1]:
+with colB:
     st.markdown(f"""
-    <div style='background:{colors["Expenses"]};padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Expenses</h3>
         <h2 style='color:#fcd5ce;margin:0;'>₹{expenses:,.2f}</h2>
     </div>
     """, unsafe_allow_html=True)
 
 bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
-with cols[2]:
+with colC:
     st.markdown(f"""
-    <div style='background:{colors["Balance"]};padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Balance</h3>
         <h2 style='color:{bal_color};margin:0;'>₹{balance:,.2f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-with cols[3]:
-    st.markdown(f"""
-    <div style='background:{colors["Savings"]};padding:20px;border-radius:15px;text-align:center;'>
-        <h3 style='color:white;margin:0;'>Savings</h3>
-        <h2 style='color:#fff3e0;margin:0;'>₹{savings:,.2f}</h2>
     </div>
     """, unsafe_allow_html=True)
 
@@ -120,8 +105,8 @@ if df.empty:
 # --- CATEGORY BREAKDOWN ---
 st.markdown("### 📊 Category Breakdown")
 cat_df = df.groupby(["category", "type"])["amount"].sum().reset_index()
-fig = px.pie(cat_df, names="category", values="amount", hole=0.5, title="Expense/Income Split (₹)",
-             color="category", color_discrete_sequence=px.colors.qualitative.Bold)
+
+fig = px.pie(cat_df, names="category", values="amount", hole=0.5, title="Expense/Income Split (₹)")
 st.plotly_chart(fig, use_container_width=True)
 
 # --- TABLE VIEW ---
