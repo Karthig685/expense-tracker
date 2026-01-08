@@ -200,6 +200,103 @@ def generate_pdf():
     doc.build(elements)
     return file.name
 
+def generate_visual_pdf(df, month, year, income, expenses, savings, net_balance):
+    temp_files = []
+
+    # ---------------------------
+    # 1️⃣ CASHFLOW LINE CHART
+    # ---------------------------
+    monthly = (
+        df.groupby(["date", "type"])["amount"]
+        .sum()
+        .reset_index()
+    )
+
+    plt.figure(figsize=(6, 3))
+    for t in ["Income", "Expense"]:
+        subset = monthly[monthly["type"] == t]
+        plt.plot(subset["date"], subset["amount"], label=t)
+
+    plt.title("Cashflow Trend")
+    plt.legend()
+    plt.tight_layout()
+
+    cashflow_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(cashflow_img.name)
+    plt.close()
+    temp_files.append(cashflow_img.name)
+
+    # ---------------------------
+    # 2️⃣ EXPENSE CATEGORY BAR
+    # ---------------------------
+    exp_cat = (
+        df[df.type == "Expense"]
+        .groupby("category")["amount"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+
+    plt.figure(figsize=(6, 3))
+    exp_cat.plot(kind="bar")
+    plt.title("Expense by Category")
+    plt.tight_layout()
+
+    category_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(category_img.name)
+    plt.close()
+    temp_files.append(category_img.name)
+
+    # ---------------------------
+    # 3️⃣ BUILD PDF
+    # ---------------------------
+    pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    doc = SimpleDocTemplate(pdf_file.name, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    # Title
+    elements.append(Paragraph("Monthly Financial Dashboard", styles["Title"]))
+    elements.append(Spacer(1, 12))
+
+    # KPI SECTION
+    elements.append(Paragraph(
+        f"""
+        <b>Income:</b> ₹{income:,.0f} &nbsp;&nbsp;&nbsp;
+        <b>Expenses:</b> ₹{expenses:,.0f} &nbsp;&nbsp;&nbsp;
+        <b>Savings:</b> ₹{savings:,.0f} &nbsp;&nbsp;&nbsp;
+        <b>Net Balance:</b> ₹{net_balance:,.0f}
+        """,
+        styles["Normal"]
+    ))
+
+    elements.append(Spacer(1, 20))
+
+    # Charts
+    elements.append(Paragraph("<b>Cashflow Trend</b>", styles["Heading2"]))
+    elements.append(RLImage(cashflow_img.name, width=6 * inch, height=3 * inch))
+
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("<b>Expense Breakdown</b>", styles["Heading2"]))
+    elements.append(RLImage(category_img.name, width=6 * inch, height=3 * inch))
+
+    elements.append(Spacer(1, 20))
+
+    # Written Analysis
+    insight = (
+        f"The month of {month}/{year} shows a "
+        f"{'positive surplus' if net_balance >= 0 else 'negative deficit'} position. "
+        "Expense concentration suggests areas for optimization. "
+        "Maintaining or increasing savings will improve financial stability."
+    )
+
+    elements.append(Paragraph("<b>Financial Insights</b>", styles["Heading2"]))
+    elements.append(Paragraph(insight, styles["Normal"]))
+
+    doc.build(elements)
+
+    return pdf_file.name
+
+
 if st.button("📥 Generate PDF"):
     path = generate_pdf()
     with open(path, "rb") as f:
@@ -212,4 +309,5 @@ if st.button("📥 Generate PDF"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
