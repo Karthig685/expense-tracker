@@ -40,14 +40,12 @@ st.title("💰 Expense Tracker")
 # --- SIDEBAR INPUT ---
 st.sidebar.header("Add Entry (Income / Expense)")
 date = st.sidebar.date_input("Date", datetime.now())
-entry_type = st.sidebar.selectbox("Type", ["Income", "Expense", "Savings"])
+entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
 
 if entry_type == "Income":
     category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
-elif entry_type == "Expense":
-    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
 else:
-    category = st.sidebar.selectbox("Category", ["RD", "Investments", "Other"])
+    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
 
 amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
 
@@ -71,8 +69,7 @@ st.markdown("### 📘 Accounting Summary")
 
 income = df[df["type"] == "Income"]["amount"].sum() if not df.empty else 0
 expenses = df[df["type"] == "Expense"]["amount"].sum() if not df.empty else 0
-savings = df[df["type"] == "Savings"]["amount"].sum() if not df.empty else 0
-balance = income - expenses - savings
+balance = income - expenses
 
 colA, colB, colC = st.columns([1,1,1])
 
@@ -93,19 +90,7 @@ with colB:
     """, unsafe_allow_html=True)
 
 bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
-
-
 with colC:
-    st.markdown(f"""
-    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
-        <h3 style='color:white;margin:0;'>Savings</h3>
-        <h2 style='color:#fcd5ce;margin:0;'>₹{savings:,.2f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
-
-with colD:
     st.markdown(f"""
     <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Balance</h3>
@@ -134,4 +119,3 @@ delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
 if st.button("Delete"):
     delete_entry(delete_id)
     st.success("Deleted!")
-
