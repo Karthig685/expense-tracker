@@ -297,17 +297,23 @@ def generate_visual_pdf(df, month, year, income, expenses, savings, net_balance)
     return pdf_file.name
 
 
-if st.button("📥 Generate PDF"):
-    path = generate_pdf()
-    with open(path, "rb") as f:
+if st.button("📥 Generate Visual PDF Report"):
+    pdf_path = generate_visual_pdf(
+        df, month, year,
+        income, expenses, savings, net_balance
+    )
+
+    with open(pdf_path, "rb") as f:
         st.download_button(
-            "⬇ Download PDF",
+            "⬇ Download Dashboard PDF",
             f,
-            file_name=f"Expense_Report_{month}_{year}.pdf",
+            file_name=f"Dashboard_Report_{month}_{year}.pdf",
             mime="application/pdf"
         )
 
+
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
 
