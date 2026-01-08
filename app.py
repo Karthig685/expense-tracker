@@ -3,352 +3,119 @@ from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import calendar
-import matplotlib.pyplot as plt
-from reportlab.platypus import Image as RLImage
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import inch
-import tempfile
 
-# -------------------------------------------------
-# PAGE CONFIG
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Smart Expense Tracker",
-    page_icon="₹",
-    layout="centered"
-)
+# --- SUPABASE SETUP ---
+url = "https://ykgucpcjxwddnwznkqfa.supabase.co"
+key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZ3VjcGNqeHdkZG53em5rcWZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1Njg1MjgsImV4cCI6MjA4MDE0NDUyOH0.A-Gwlhbrb9QEa9u9C2Ghobm2zPw-zaLLUFdKU29rrP8"
+supabase: Client = create_client(url, key)
 
-# -------------------------------------------------
-# SUPABASE
-# -------------------------------------------------
-supabase: Client = create_client(
-    st.secrets["SUPABASE_URL"],
-    st.secrets["SUPABASE_KEY"]
-)
+# --- INSERT NEW ENTRY ---
+def add_entry(date, category, amount, entry_type):
+    supabase.table("expenses").insert({
+        "date": str(date),
+        "category": category,
+        "amount": amount,
+        "type": entry_type
+    }).execute()
 
-# -------------------------------------------------
-# SESSION STATE (MONTH/YEAR)
-# -------------------------------------------------
-today = datetime.now()
-
-st.session_state.setdefault("month", today.month)
-st.session_state.setdefault("year", today.year)
-st.session_state.setdefault("entry_type", "Income")
-
-# -------------------------------------------------
-# DB FUNCTIONS
-# -------------------------------------------------
-@st.cache_data(ttl=60)
+# --- FETCH DATA ---
 def load_data(month, year):
-    # compute last day of month dynamically to avoid hardcoding 31
-    last_day = calendar.monthrange(year, month)[1]
-    res = (
-        supabase.table("expenses")
-        .select("*")
-        .gte("date", f"{year}-{month:02d}-01")
-        .lte("date", f"{year}-{month:02d}-{last_day:02d}")
-        .execute()
-    )
-    df = pd.DataFrame(res.data)
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
+    # Filter by month/year
+    query = supabase.table("expenses").select("*").execute()
+    df = pd.DataFrame(query.data)
+    if df.empty:
+        return df
+    df["date"] = pd.to_datetime(df["date"])
+    df = df[(df["date"].dt.month == month) & (df["date"].dt.year == year)]
     return df
 
-def add_entry(data):
-    supabase.table("expenses").insert(data).execute()
-    # clear cache for load_data only so other caches remain intact
-    load_data.clear()
-
+# --- DELETE ENTRY ---
 def delete_entry(entry_id):
     supabase.table("expenses").delete().eq("id", entry_id).execute()
-    # clear cache for load_data only so other caches remain intact
-    load_data.clear()
 
-# -------------------------------------------------
-# HEADER
-# -------------------------------------------------
-st.title("💸 Smart Expense Tracker")
-#st.caption("Stable • Correct • Production-Grade")
+# --- STREAMLIT CONFIG ---
+st.set_page_config(page_title="Expense Tracker (₹)", layout="wide")
+st.title("💰 Expense Tracker")
 
-# -------------------------------------------------
-# MONTH / YEAR
-# -------------------------------------------------
-c1, c2 = st.columns(2)
-with c1:
-    st.session_state.month = st.selectbox(
-        "Month",
-        range(1, 13),
-        index=st.session_state.month - 1
-    )
-with c2:
-    years = list(range(2022, today.year + 2))
-    st.session_state.year = st.selectbox(
-        "Year",
-        years,
-        index=years.index(st.session_state.year)
-    )
+# --- SIDEBAR INPUT ---
+st.sidebar.header("Add Entry (Income / Expense)")
+date = st.sidebar.date_input("Date", datetime.now())
+entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
 
-month = st.session_state.month
-year = st.session_state.year
+if entry_type == "Income":
+    category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
+else:
+    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Savings", "Other"])
 
+amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
+
+if st.sidebar.button("Add"):
+    add_entry(date, category, amount, entry_type)
+    st.sidebar.success("Added successfully!")
+
+# --- MONTH FILTER ---
+today = datetime.now()
+col1, col2 = st.columns(2)
+with col1:
+    month = st.selectbox("Month", list(range(1, 13)), index=today.month-1)
+with col2:
+    year = st.number_input("Year", min_value=2000, max_value=2100, value=today.year)
+
+# --- LOAD DATA ---
 df = load_data(month, year)
 
+# --- ACCOUNTING SUMMARY ---
+st.markdown("### 📘 Accounting Summary")
 
-# ================= SAFE INITIALIZATION (ADD HERE) =================
-income = 0.0
-expenses = 0.0
-savings = 0.0
-net_balance = 0.0
+income = df[df["type"] == "Income"]["amount"].sum() if not df.empty else 0
+expenses = df[df["type"] == "Expense"]["amount"].sum() if not df.empty else 0
+balance = income - expenses
 
-if not df.empty:
-    income = df[df["type"] == "Income"]["amount"].sum()
-    expenses = df[df["type"] == "Expense"]["amount"].sum()
-    savings = (
-        df[df["type"] == "Savings"]["amount"].sum()
-        if "Savings" in df["type"].values
-        else 0.0
-    )
-    net_balance = income - expenses - savings
-# ================================================================
+colA, colB, colC = st.columns([1,1,1])
 
-# -------------------------------------------------
-# CATEGORY MAP & ADD ENTRY (MOBILE-FRIENDLY UX)
-# Entry type radio stays outside the form; the whole
-# add-entry UI is placed inside an expander for small screens.
-# -------------------------------------------------
-category_map = {
-    "Income": ["Salary", "Bonus", "Interest", "Other"],
-    "Expense": [
-        "Food", "Groceries", "Transport", "Rent",
-        "Bills", "Utilities", "Health",
-        "Shopping", "Entertainment", "Other"
-    ],
-    "Savings": ["Emergency Fund", "Investments", "FD / RD"]
-}
+with colA:
+    st.markdown(f"""
+    <div style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
+        <h3 style='color:white;margin:0;'>Income</h3>
+        <h2 style='color:#d8f3dc;margin:0;'>₹{income:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
 
-with st.expander("Add Entry", expanded=False):
-    # Entry type must be outside the form so category updates correctly
-    entry_type = st.radio(
-        "Type",
-        ["Income", "Expense", "Savings"],
-        horizontal=True,
-        key="entry_type"
-    )
+with colB:
+    st.markdown(f"""
+    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
+        <h3 style='color:white;margin:0;'>Expenses</h3>
+        <h2 style='color:#fcd5ce;margin:0;'>₹{expenses:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # Category updates dynamically based on selected type
-    category = st.selectbox(
-        "Category",
-        category_map.get(entry_type, []),
-        key="entry_category"
-    )
-
-    with st.form("add_form", clear_on_submit=True):
-        date = st.date_input("Date", today)
-        amount = st.number_input("Amount (₹)", min_value=1.0, step=100.0)
-        submit = st.form_submit_button("Add Entry")
-
-        if submit:
-            add_entry({
-                "date": str(date),
-                "type": entry_type,
-                "category": category,
-                "amount": amount
-            })
-            st.success("Entry added successfully")
-            # Clear the load_data cache and rerun to show new data
-            load_data.clear()
-            st.experimental_rerun()
-
-# -------------------------------------------------
-# SUMMARY (ALWAYS VISIBLE FOR MOBILE)
-# -------------------------------------------------
-st.subheader("📘 Monthly Summary")
-# Use values computed earlier (defaults to 0.0 when no records)
-a, b, c, d = st.columns(4)
-a.metric("Income", f"₹{income:,.0f}")
-b.metric("Expenses", f"₹{expenses:,.0f}")
-c.metric("Savings", f"₹{savings:,.0f}")
-d.metric("Net Balance", f"₹{net_balance:,.0f}")
+bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
+with colC:
+    st.markdown(f"""
+    <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
+        <h3 style='color:white;margin:0;'>Balance</h3>
+        <h2 style='color:{bal_color};margin:0;'>₹{balance:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
 
 if df.empty:
     st.info("No records for this month.")
+    st.stop()
 
-# -------------------------------------------------
-# CHART
-# -------------------------------------------------
-st.subheader("📊 Expense Breakdown")
-exp_df = df[df.type == "Expense"]
-if not exp_df.empty:
-    fig = px.pie(exp_df, values="amount", names="category", hole=0.55)
-    st.plotly_chart(fig, use_container_width=True)
+# --- CATEGORY BREAKDOWN ---
+st.markdown("### 📊 Category Breakdown")
+cat_df = df.groupby(["category", "type"])["amount"].sum().reset_index()
 
-# -------------------------------------------------
-# TABLE + SAFE DELETE WORKFLOW
-# -------------------------------------------------
-# -------------------------------------------------
-# TABLE + VERY SAFE DELETE WORKFLOW
-# -------------------------------------------------
-st.subheader("📄 Records")
-df_table = df.sort_values("date", ascending=False)
-st.dataframe(df_table, hide_index=True, use_container_width=True)
+fig = px.pie(cat_df, names="category", values="amount", hole=0.5, title="Expense/Income Split (₹)")
+st.plotly_chart(fig, use_container_width=True)
 
-if not df_table.empty:
-    st.info("To delete a record, enter its ID (from the table above).")
-    entry_id = st.number_input("Record ID", min_value=1, step=1, format="%d")
+# --- TABLE VIEW ---
+st.markdown("### 📄 Detailed Records")
+st.dataframe(df, use_container_width=True)
 
-    if st.button("🗑 Delete Record by ID"):
-        try:
-            delete_entry(int(entry_id))
-            st.success(f"Record {int(entry_id)} deleted successfully ✅")
-            load_data.clear()
-            st.experimental_rerun()
-        except Exception:
-            st.error(f"Failed to delete record {int(entry_id)}. Make sure the ID exists.")
-
-
- 
-
-# -------------------------------------------------
-# PDF REPORT
-# -------------------------------------------------
-st.subheader("📄 Download PDF Report")
-
-def generate_pdf():
-    file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    doc = SimpleDocTemplate(file.name, pagesize=A4)
-    styles = getSampleStyleSheet()
-    elements = []
-
-    elements.append(Paragraph("Monthly Expense Report", styles["Title"]))
-    elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(f"Month / Year: {month} / {year}", styles["Normal"]))
-    elements.append(Paragraph(f"Income: ₹{income:,.2f}", styles["Normal"]))
-    elements.append(Paragraph(f"Expenses: ₹{expense:,.2f}", styles["Normal"]))
-    elements.append(Paragraph(f"Savings: ₹{savings:,.2f}", styles["Normal"]))
-    elements.append(Paragraph(f"Net Balance: ₹{net:,.2f}", styles["Normal"]))
-
-    doc.build(elements)
-    return file.name
-
-def generate_visual_pdf(df, month, year, income, expenses, savings, net_balance):
-    temp_files = []
-
-    # ---------------------------
-    # 1️⃣ CASHFLOW LINE CHART
-    # ---------------------------
-    monthly = (
-        df.groupby(["date", "type"])["amount"]
-        .sum()
-        .reset_index()
-    )
-
-    plt.figure(figsize=(6, 3))
-    for t in ["Income", "Expense"]:
-        subset = monthly[monthly["type"] == t]
-        plt.plot(subset["date"], subset["amount"], label=t)
-
-    plt.title("Cashflow Trend")
-    plt.legend()
-    plt.tight_layout()
-
-    cashflow_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(cashflow_img.name)
-    plt.close()
-    temp_files.append(cashflow_img.name)
-
-    # ---------------------------
-    # 2️⃣ EXPENSE CATEGORY BAR
-    # ---------------------------
-    exp_cat = (
-        df[df.type == "Expense"]
-        .groupby("category")["amount"]
-        .sum()
-        .sort_values(ascending=False)
-    )
-
-    plt.figure(figsize=(6, 3))
-    exp_cat.plot(kind="bar")
-    plt.title("Expense by Category")
-    plt.tight_layout()
-
-    category_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(category_img.name)
-    plt.close()
-    temp_files.append(category_img.name)
-
-    # ---------------------------
-    # 3️⃣ BUILD PDF
-    # ---------------------------
-    pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    doc = SimpleDocTemplate(pdf_file.name, pagesize=A4)
-    styles = getSampleStyleSheet()
-    elements = []
-
-    # Title
-    elements.append(Paragraph("Monthly Financial Dashboard", styles["Title"]))
-    elements.append(Spacer(1, 12))
-
-    # KPI SECTION
-    elements.append(Paragraph(
-        f"""
-        <b>Income:</b> ₹{income:,.0f} &nbsp;&nbsp;&nbsp;
-        <b>Expenses:</b> ₹{expenses:,.0f} &nbsp;&nbsp;&nbsp;
-        <b>Savings:</b> ₹{savings:,.0f} &nbsp;&nbsp;&nbsp;
-        <b>Net Balance:</b> ₹{net_balance:,.0f}
-        """,
-        styles["Normal"]
-    ))
-
-    elements.append(Spacer(1, 20))
-
-    # Charts
-    elements.append(Paragraph("<b>Cashflow Trend</b>", styles["Heading2"]))
-    elements.append(RLImage(cashflow_img.name, width=6 * inch, height=3 * inch))
-
-    elements.append(Spacer(1, 20))
-    elements.append(Paragraph("<b>Expense Breakdown</b>", styles["Heading2"]))
-    elements.append(RLImage(category_img.name, width=6 * inch, height=3 * inch))
-
-    elements.append(Spacer(1, 20))
-
-    # Written Analysis
-    insight = (
-        f"The month of {month}/{year} shows a "
-        f"{'positive surplus' if net_balance >= 0 else 'negative deficit'} position. "
-        "Expense concentration suggests areas for optimization. "
-        "Maintaining or increasing savings will improve financial stability."
-    )
-
-    elements.append(Paragraph("<b>Financial Insights</b>", styles["Heading2"]))
-    elements.append(Paragraph(insight, styles["Normal"]))
-
-    doc.build(elements)
-
-    return pdf_file.name
-
-
-if st.button("📥 Generate Visual PDF Report"):
-    pdf_path = generate_visual_pdf(
-        df, month, year,
-        income, expenses, savings, net_balance
-    )
-
-    with open(pdf_path, "rb") as f:
-        st.download_button(
-            "⬇ Download Dashboard PDF",
-            f,
-            file_name=f"Dashboard_Report_{month}_{year}.pdf",
-            mime="application/pdf"
-        )
-
-
-st.markdown("---")
-st.caption("Built with Streamlit & Supabase")
-
-
-
-
-
+# --- DELETE ENTRY ---
+st.markdown("### ❌ Delete Record")
+delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
+if st.button("Delete"):
+    delete_entry(delete_id)
+    st.success("Deleted!")
