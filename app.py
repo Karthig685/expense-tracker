@@ -91,6 +91,24 @@ year = st.session_state.year
 
 df = load_data(month, year)
 
+
+# ================= SAFE INITIALIZATION (ADD HERE) =================
+income = 0.0
+expenses = 0.0
+savings = 0.0
+net_balance = 0.0
+
+if not df.empty:
+    income = df[df["type"] == "Income"]["amount"].sum()
+    expenses = df[df["type"] == "Expense"]["amount"].sum()
+    savings = (
+        df[df["type"] == "Savings"]["amount"].sum()
+        if "Savings" in df["type"].values
+        else 0.0
+    )
+    net_balance = income - expenses - savings
+# ================================================================
+
 # -------------------------------------------------
 # ADD ENTRY (CORRECT UX)
 # -------------------------------------------------
@@ -314,5 +332,6 @@ if st.button("📥 Generate Visual PDF Report"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
 
