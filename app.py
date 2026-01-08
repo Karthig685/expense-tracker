@@ -95,7 +95,7 @@ with colB:
 bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
 with colC:
     st.markdown(f"""
-    <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#001d3d;padding:10px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Balance</h3>
         <h2 style='color:{bal_color};margin:0;'>₹{balance:,.2f}</h2>
     </div>
@@ -103,7 +103,7 @@ with colC:
 
 with colD:
     st.markdown(f"""
-    <div style='background:#6a994e;padding:20px;border-radius:15px;text-align:center;'>
+    <div style='background:#6a994e;padding:10px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Savings</h3>
         <h2 style='color:#f0efeb;margin:0;'>₹{savings:,.2f}</h2>
     </div>
@@ -130,3 +130,4 @@ delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
 if st.button("Delete"):
     delete_entry(delete_id)
     st.success("Deleted!")
+
