@@ -3,120 +3,129 @@ from supabase import create_client, Client
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import os
 
-# --- SUPABASE SETUP ---
-url = "https://ykgucpcjxwddnwznkqfa.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrZ3VjcGNqeHdkZG53em5rcWZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1Njg1MjgsImV4cCI6MjA4MDE0NDUyOH0.A-Gwlhbrb9QEa9u9C2Ghobm2zPw-zaLLUFdKU29rrP8"
-supabase: Client = create_client(url, key)
+# ---------------- CONFIG ----------------
+st.set_page_config(
+    page_title="Smart Expense Tracker",
+    page_icon="💸",
+    layout="centered"
+)
 
-# --- INSERT NEW ENTRY ---
-def add_entry(date, category, amount, entry_type):
-    supabase.table("expenses").insert({
-        "date": str(date),
-        "category": category,
-        "amount": amount,
-        "type": entry_type
-    }).execute()
+# ---------------- SUPABASE ----------------
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"),
+    os.getenv("SUPABASE_KEY")
+)
 
-# --- FETCH DATA ---
+# ---------------- DATA LAYER ----------------
+@st.cache_data(ttl=60)
 def load_data(month, year):
-    # Filter by month/year
-    query = supabase.table("expenses").select("*").execute()
-    df = pd.DataFrame(query.data)
-    if df.empty:
-        return df
-    df["date"] = pd.to_datetime(df["date"])
-    df = df[(df["date"].dt.month == month) & (df["date"].dt.year == year)]
+    res = (
+        supabase.table("expenses")
+        .select("*")
+        .gte("date", f"{year}-{month:02d}-01")
+        .lte("date", f"{year}-{month:02d}-31")
+        .execute()
+    )
+    df = pd.DataFrame(res.data)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
     return df
 
-# --- DELETE ENTRY ---
+def add_entry(data):
+    supabase.table("expenses").insert(data).execute()
+    st.cache_data.clear()
+
 def delete_entry(entry_id):
     supabase.table("expenses").delete().eq("id", entry_id).execute()
+    st.cache_data.clear()
 
-# --- STREAMLIT CONFIG ---
-st.set_page_config(page_title="Expense Tracker (₹)", layout="wide")
-st.title("💰 Expense Tracker")
+# ---------------- HEADER ----------------
+st.title("💸 Smart Expense Tracker")
+st.caption("Mobile-optimized • Accountant-approved")
 
-# --- SIDEBAR INPUT ---
-st.sidebar.header("Add Entry (Income / Expense)")
-date = st.sidebar.date_input("Date", datetime.now())
-entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
-
-if entry_type == "Income":
-    category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
-else:
-    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Savings", "Other"])
-
-amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
-
-if st.sidebar.button("Add"):
-    add_entry(date, category, amount, entry_type)
-    st.sidebar.success("Added successfully!")
-
-# --- MONTH FILTER ---
+# ---------------- FILTER ----------------
 today = datetime.now()
 col1, col2 = st.columns(2)
-with col1:
-    month = st.selectbox("Month", list(range(1, 13)), index=today.month-1)
-with col2:
-    year = st.number_input("Year", min_value=2000, max_value=2100, value=today.year)
 
-# --- LOAD DATA ---
+with col1:
+    month = st.selectbox("Month", range(1, 13), index=today.month - 1)
+with col2:
+    year = st.selectbox("Year", range(2022, today.year + 2), index=2)
+
 df = load_data(month, year)
 
-# --- ACCOUNTING SUMMARY ---
-st.markdown("### 📘 Accounting Summary")
+# ---------------- ADD ENTRY ----------------
+with st.expander("➕ Add Income / Expense", expanded=False):
+    with st.form("add_form", clear_on_submit=True):
+        date = st.date_input("Date", today)
+        entry_type = st.radio("Type", ["Income", "Expense", "Savings"], horizontal=True)
 
-income = df[df["type"] == "Income"]["amount"].sum() if not df.empty else 0
-expenses = df[df["type"] == "Expense"]["amount"].sum() if not df.empty else 0
-balance = income - expenses
+        category_map = {
+            "Income": ["Salary", "Bonus", "Interest", "Other"],
+            "Expense": ["Food", "Groceries", "Transport", "Rent", "Bills", "Health", "Shopping", "Other"],
+            "Savings": ["Emergency Fund", "Investments", "FD/RD"]
+        }
 
-colA, colB, colC = st.columns([1,1,1])
+        category = st.selectbox("Category", category_map[entry_type])
+        amount = st.number_input("Amount (₹)", min_value=1.0, step=100.0)
 
-with colA:
-    st.markdown(f"""
-    <div style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
-        <h3 style='color:white;margin:0;'>Income</h3>
-        <h2 style='color:#d8f3dc;margin:0;'>₹{income:,.2f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+        submitted = st.form_submit_button("Add Entry")
+        if submitted:
+            add_entry({
+                "date": str(date),
+                "type": entry_type,
+                "category": category,
+                "amount": amount
+            })
+            st.success("Entry added successfully")
 
-with colB:
-    st.markdown(f"""
-    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
-        <h3 style='color:white;margin:0;'>Expenses</h3>
-        <h2 style='color:#fcd5ce;margin:0;'>₹{expenses:,.2f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+# ---------------- ACCOUNTING SUMMARY ----------------
+if not df.empty:
+    income = df[df.type == "Income"].amount.sum()
+    expenses = df[df.type == "Expense"].amount.sum()
+    savings = df[df.type == "Savings"].amount.sum()
+    net_balance = income - expenses - savings
 
-bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
-with colC:
-    st.markdown(f"""
-    <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
-        <h3 style='color:white;margin:0;'>Balance</h3>
-        <h2 style='color:{bal_color};margin:0;'>₹{balance:,.2f}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+    colA, colB, colC, colD = st.columns(4)
 
+    colA.metric("Income", f"₹{income:,.0f}")
+    colB.metric("Expenses", f"₹{expenses:,.0f}", delta=f"-₹{expenses:,.0f}")
+    colC.metric("Savings", f"₹{savings:,.0f}")
+    colD.metric(
+        "Net Balance",
+        f"₹{net_balance:,.0f}",
+        delta="Surplus" if net_balance >= 0 else "Deficit"
+    )
+
+# ---------------- VISUALS ----------------
 if df.empty:
-    st.info("No records for this month.")
+    st.info("No data available for selected period.")
     st.stop()
 
-# --- CATEGORY BREAKDOWN ---
-st.markdown("### 📊 Category Breakdown")
-cat_df = df.groupby(["category", "type"])["amount"].sum().reset_index()
+st.subheader("📊 Spending Distribution")
 
-fig = px.pie(cat_df, names="category", values="amount", hole=0.5, title="Expense/Income Split (₹)")
-st.plotly_chart(fig, use_container_width=True)
+expense_df = df[df.type == "Expense"]
+if not expense_df.empty:
+    pie = px.pie(
+        expense_df,
+        values="amount",
+        names="category",
+        hole=0.55
+    )
+    st.plotly_chart(pie, use_container_width=True)
 
-# --- TABLE VIEW ---
-st.markdown("### 📄 Detailed Records")
-st.dataframe(df, use_container_width=True)
+# ---------------- TABLE ----------------
+st.subheader("📄 Records")
+selected = st.dataframe(
+    df.sort_values("date", ascending=False),
+    use_container_width=True,
+    hide_index=True,
+    selection_mode="single-row"
+)
 
-# --- DELETE ENTRY ---
-st.markdown("### ❌ Delete Record")
-delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
-if st.button("Delete"):
-    delete_entry(delete_id)
-    st.success("Deleted!")
-
+# ---------------- DELETE ----------------
+if selected and st.button("🗑 Delete Selected Entry"):
+    delete_entry(selected["id"].values[0])
+    st.success("Entry deleted")
