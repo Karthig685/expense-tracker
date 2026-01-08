@@ -196,61 +196,20 @@ df_table = df.sort_values("date", ascending=False)
 st.dataframe(df_table, hide_index=True, use_container_width=True)
 
 if not df_table.empty:
-    st.markdown("### ⚠️ Delete Record (Danger Zone)")
+    st.info("To delete a record, enter its ID (from the table above).")
+    entry_id = st.number_input("Record ID", min_value=1, step=1, format="%d")
 
-    options = []
-    record_map = {}
+    if st.button("🗑 Delete Record by ID"):
+        try:
+            delete_entry(int(entry_id))
+            st.success(f"Record {int(entry_id)} deleted successfully ✅")
+            load_data.clear()
+            st.experimental_rerun()
+        except Exception:
+            st.error(f"Failed to delete record {int(entry_id)}. Make sure the ID exists.")
 
-    for _, row in df_table.iterrows():
-        date_str = row["date"].date() if pd.notnull(row["date"]) else ""
-        label = (
-            f"ID {int(row['id'])} | {date_str} | "
-            f"{row['type']} | {row['category']} | ₹{row['amount']:,.0f}"
-        )
-        options.append(label)
-        record_map[label] = row
 
-    selected_label = st.selectbox(
-        "Select a record to delete",
-        options,
-        help="This action is irreversible"
-    )
-
-    selected_row = record_map[selected_label]
-
-    # --- PREVIEW CARD ---
-    st.markdown(
-        f"""
-        <div style="border:1px solid #ff4d4f;
-                    border-radius:10px;
-                    padding:12px;
-                    background:#fff1f0;">
-        <b>Selected Record</b><br>
-        📅 Date: {selected_row['date'].date()}<br>
-        📂 Type: {selected_row['type']}<br>
-        🏷 Category: {selected_row['category']}<br>
-        💰 Amount: ₹{selected_row['amount']:,.0f}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # --- CONFIRMATION ---
-    confirm = st.checkbox(
-        "I understand this action is permanent and cannot be undone"
-    )
-
-    # --- FINAL DELETE BUTTON ---
-    if st.button(
-        "🗑 Permanently Delete",
-        disabled=not confirm,
-        type="primary"
-    ):
-        delete_entry(int(selected_row["id"]))
-        st.success("Record permanently deleted ✅")
-        load_data.clear()
-        st.experimental_rerun()
-
+ 
 
 # -------------------------------------------------
 # PDF REPORT
@@ -388,6 +347,7 @@ if st.button("📥 Generate Visual PDF Report"):
 
 st.markdown("---")
 st.caption("Built with Streamlit & Supabase")
+
 
 
 
