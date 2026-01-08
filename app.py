@@ -38,12 +38,14 @@ st.set_page_config(page_title="Expense Tracker (₹)", layout="wide")
 st.title("💰 Expense Tracker")
 
 # --- SIDEBAR INPUT ---
-st.sidebar.header("Add Entry (Income / Expense)")
+st.sidebar.header("Add Entry (Income / Expense / Savings)")
 date = st.sidebar.date_input("Date", datetime.now())
-entry_type = st.sidebar.selectbox("Type", ["Income", "Expense"])
+entry_type = st.sidebar.selectbox("Type", ["Income", "Expense", "Savings"])
 
 if entry_type == "Income":
     category = st.sidebar.selectbox("Category", ["Salary", "Bonus", "Interest", "Other"])
+elif entry_type == "Savings":
+    category = st.sidebar.selectbox("Category", ["Fixed Deposit", "Mutual Funds", "Other"]) 
 else:
     category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
 
@@ -69,13 +71,31 @@ st.markdown("### 📘 Accounting Summary")
 
 income = df[df["type"] == "Income"]["amount"].sum() if not df.empty else 0
 expenses = df[df["type"] == "Expense"]["amount"].sum() if not df.empty else 0
-balance = income - expenses
+savings = df[df["type"] == "Savings"]["amount"].sum() if not df.empty else 0
+balance = income - expenses - savings
 
-colA, colB, colC = st.columns([1,1,1])
+# Add responsive CSS
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+    .summary-box {
+        padding: 12px !important;
+    }
+    .summary-box h3 {
+        font-size: 14px !important;
+    }
+    .summary-box h2 {
+        font-size: 18px !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
+colA, colB, colC, colD = st.columns([1,1,1,1])
 
 with colA:
     st.markdown(f"""
-    <div style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
+    <div class='summary-box' style='background:#0a9396;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Income</h3>
         <h2 style='color:#d8f3dc;margin:0;'>₹{income:,.2f}</h2>
     </div>
@@ -83,7 +103,7 @@ with colA:
 
 with colB:
     st.markdown(f"""
-    <div style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
+    <div class='summary-box' style='background:#9b2226;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Expenses</h3>
         <h2 style='color:#fcd5ce;margin:0;'>₹{expenses:,.2f}</h2>
     </div>
@@ -92,9 +112,17 @@ with colB:
 bal_color = "#2d6a4f" if balance >= 0 else "#e63946"
 with colC:
     st.markdown(f"""
-    <div style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
+    <div class='summary-box' style='background:#001d3d;padding:20px;border-radius:15px;text-align:center;'>
         <h3 style='color:white;margin:0;'>Balance</h3>
         <h2 style='color:{bal_color};margin:0;'>₹{balance:,.2f}</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+with colD:
+    st.markdown(f"""
+    <div class='summary-box' style='background:#6a994e;padding:20px;border-radius:15px;text-align:center;'>
+        <h3 style='color:white;margin:0;'>Savings</h3>
+        <h2 style='color:#f0efeb;margin:0;'>₹{savings:,.2f}</h2>
     </div>
     """, unsafe_allow_html=True)
 
