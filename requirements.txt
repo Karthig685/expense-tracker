@@ -1,10 +1,6 @@
 streamlit
+supabase
 pandas
 plotly
-supabase
-python-dotenv
-reportlab
-kaleido
-matplotlib
 numpy
-calender
+python-dotenv
