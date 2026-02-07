@@ -47,7 +47,7 @@ if entry_type == "Income":
 elif entry_type == "Savings":
     category = st.sidebar.selectbox("Category", ["Fixed Deposit", "Mutual Funds", "Other"]) 
 else:
-    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Other"])
+    category = st.sidebar.selectbox("Category", ["Food", "Groceries", "Transport","Snacks", "Fashion", "Rent", "Bills", "Utilities", "Health Care", "Electronics", "Entertainment", "College", "Other"])
 
 amount = st.sidebar.number_input("Amount (₹)", min_value=1.0, format="%.2f")
 
@@ -130,5 +130,6 @@ delete_id = st.number_input("Enter ID to delete", min_value=0, value=0)
 if st.button("Delete"):
     delete_entry(delete_id)
     st.success("Deleted!")
+
 
 
